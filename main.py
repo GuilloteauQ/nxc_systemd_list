@@ -47,6 +47,10 @@ def read_rpath_variable(binary_path):
             return line.split()[1]
     return None
     
+def get_list_of_needed_libs(binary_path):
+    ldd_process = subprocess.run(["ldd", binary_path], capture_output=True)
+    lines = ldd_process.stdout.decode().split("\n")
+    return [line.split(" => ")[0].strip() for line in lines if len(line) > 0] 
         
 
 def main():
@@ -77,13 +81,19 @@ def main():
             # extract the binary
             binaries = extract_exec_start_from_config(service_config)
 
-            # get the objdump -x BIN | grep RUNPATH
             for binary in binaries:
+                binary_name_short = binary.split("/")[-1]
+                services_deps_by_role[role][service_name][binary_name_short] = {}
+
+                # get the objdump -x BIN | grep RUNPATH
                 rpath = read_rpath_variable(binary)
                 if rpath:
-                    binary_name_short = binary.split("/")[-1]
-                    services_deps_by_role[role][service_name][binary_name_short] = rpath
+                    services_deps_by_role[role][service_name][binary_name_short]["RPATH"] = rpath.split(":")
 
+                # get ldd of BIN
+                ldd = get_list_of_needed_libs(binary)
+                if len(ldd) > 0:
+                    services_deps_by_role[role][service_name][binary_name_short]["ldd"] = ldd
             
             
     if args.output:
@@ -91,7 +101,6 @@ def main():
             json.dump(services_deps_by_role, output_file)
     else:
         print(json.dumps(services_deps_by_role))
-    # get ldd of BIN
     return 0
     
     
