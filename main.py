@@ -72,7 +72,7 @@ def main():
         binaries = set()
         for service_config in services_list:
             service_name = service_config.split("/")[-1]
-            services_deps_by_role[role][service_name] = []
+            services_deps_by_role[role][service_name] = {}
             # read the config for `ExecStart`
             # extract the binary
             binaries = extract_exec_start_from_config(service_config)
@@ -81,7 +81,9 @@ def main():
             for binary in binaries:
                 rpath = read_rpath_variable(binary)
                 if rpath:
-                    services_deps_by_role[role][service_name].append(rpath)
+                    binary_name_short = binary.split("/")[-1]
+                    services_deps_by_role[role][service_name][binary_name_short] = rpath
+
             
             
     if args.output:
