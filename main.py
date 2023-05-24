@@ -51,7 +51,18 @@ def get_list_of_needed_libs(binary_path):
     ldd_process = subprocess.run(["ldd", binary_path], capture_output=True)
     lines = ldd_process.stdout.decode().split("\n")
     return [line.split(" => ")[0].strip() for line in lines if len(line) > 0] 
-        
+
+def get_paths_to_copy(service, max_depth=1):
+    if max_depth == 0:
+        return set()
+    output = subprocess.run(["nix-store", "-qR", service], capture_output=True)
+    dependencies = set()
+    for dep_path in output.stdout.decode().splitlines():
+        if dep_path not in dependencies:
+            dependencies.add(dep_path)
+            dependencies = dependencies.union(get_paths_to_copy(dep_path, max_depth-1))
+    return dependencies
+
 
 def main():
     parser = argparse.ArgumentParser(description="Get the dependencies of the services of a nxc composition")
@@ -77,6 +88,7 @@ def main():
         for service_config in services_list:
             service_name = service_config.split("/")[-1]
             services_deps_by_role[role][service_name] = {}
+            services_deps_by_role[role][service_name]["store"] = list(get_paths_to_copy(service_config))
             # read the config for `ExecStart`
             # extract the binary
             binaries = extract_exec_start_from_config(service_config)
